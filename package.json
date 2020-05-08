@@ -1,0 +1,25 @@
+{
+  "name": "puppeteer-js-render",
+  "version": "1.0.0",
+  "description": "js渲染器",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qshine/puppeteer-js-render.git"
+  },
+  "author": "qshine",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/qshine/puppeteer-js-render/issues"
+  },
+  "homepage": "https://github.com/qshine/puppeteer-js-render#readme",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "console-stamp": "^0.2.9",
+    "express": "^4.17.1",
+    "puppeteer": "^2.0.0"
+  }
+}
