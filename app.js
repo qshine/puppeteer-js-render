@@ -129,7 +129,7 @@ async function fetch(options) {
     try {
         await init_page(page);
         await _fetch(page, options);
-        var result = await make_result(page, options);
+        var result = await make_result(page, options, null);
         await page.close();
         return result
     } catch (error) {
@@ -140,23 +140,27 @@ async function fetch(options) {
 }
 
 async function _fetch(page, options) {
+    // set assigned cookies
     if (options.cookies){
         all_cookies = JSON.parse(options.cookies)
         await page.setCookie(...all_cookies)
         console.log('init page cookies success.')
     }
     
+    // set webpage or mobile pattern
     if (options.mobile){
         await page.emulate(iPhone);
     }
 
-    width = options.js_viewport_width || 1280;
-    height = options.js_viewport_height || 1024;
+    // set webpage width or height. default width=1280 height=1024
+    width = options.viewport_width || 1280;
+    height = options.viewport_height || 1024;
     await page.setViewport({
         "width": width,
         "height": height
     });
 
+    // set request headers
     if (options.headers) {
         options.headers = JSON.parse(options.headers);
         await page.setExtraHTTPHeaders(options.headers);
@@ -172,14 +176,13 @@ async function _fetch(page, options) {
         console.log('console: ' + msg.text());
     });
 
-    // Http post method
+    // support http post method. just change the first request to post method.
     let first_request = true;
     let request_reseted = false;
     await page.setRequestInterception(true);
     if (options.method && options.method.toLowerCase() === "post") {
         page.on("request", interceptedRequest => {
             request_reseted = false;
-            end_time = null;
             if (first_request) {
                 first_request = false;
                 var data = {
@@ -194,7 +197,6 @@ async function _fetch(page, options) {
     } else {
         page.on("request", interceptedRequest => {
             request_reseted = false;
-            end_time = null;
         })
     }
 
@@ -224,6 +226,7 @@ async function _fetch(page, options) {
     });
 
     let page_settings = {};
+    // request timeout. default 20s
     var page_timeout = options.timeout ? options.timeout * 1000 : 20 * 1000;
     page_settings["timeout"] = page_timeout;
     page_settings["waitUntil"] = ["domcontentloaded", "networkidle0"];
@@ -234,21 +237,19 @@ async function _fetch(page, options) {
         throw error_message
     }
 
-    if (options.click_button) {
-        console.log('start click button ......');
-        await page.click(options.click_button);
-        console.log("end click done !!!");
-    }
-
+    // execute js script after loaded url
+    options.script_result = null
     if (options.js_script) {
-        console.log('running document-end script.');
+        console.log('running js_script ...');
         script_result = await page.evaluate(x => {
-            eval(x)
+            result = eval(x)
+            return result ? result:null
         }, options.js_script);
-        console.log("end script_result is: ", script_result);
+        console.log("script_result is: ", script_result);
         options.script_result = script_result
     }
 
+    // wait some time after loaded url or execute js script
     if (options.sleep_time) {
         console.log('start sleep ...');
         sleep_time = parseInt(options.sleep_time, 10);
@@ -256,6 +257,7 @@ async function _fetch(page, options) {
         console.log('sleep end !!!');
     }
 
+    // screenshot the webpage
     if (options.screenshot_name) {
         await page.screenshot({path: "./" + options.screenshot_name});
     }
@@ -265,12 +267,6 @@ async function _fetch(page, options) {
 
 async function make_result(page, options, error) {
     response = options.response;
-
-    var cookies = {};
-    var tmp_cookies = await page.cookies();
-    tmp_cookies.forEach(function (e) {
-        cookies[e.name] = e.value;
-    });
 
     let status_code = null;
     let headers = null;
@@ -285,17 +281,18 @@ async function make_result(page, options, error) {
     var all_cookies = await page._client.send('Network.getAllCookies');
 
     return {
-        orig_url: options.url,
-        status_code: status_code || 599,
-        error: error,
-        content: page_content,
-        headers: headers,
-        url: page.url(),
-        cookies: cookies,
-        all_cookies: all_cookies['cookies'],
-        time: (Date.now() - options.start_time) / 1000,
-        js_script_result: options.script_result,
-        save: options.save
+        code: status_code || 500,
+        err_msg: error,
+        time: (Date.now() - options.start_time),
+        data: {
+            input_url: options.url,
+            final_url: page.url(),
+            headers: headers,
+            all_cookies: all_cookies['cookies'],
+            content: page_content,
+            js_script_result: options.script_result,
+            save: options.save
+        }
     }
 }
 
@@ -316,7 +313,7 @@ let opened_page_nums = 0;
 app.post("/", async (request, response) => {
     console.log("opened pages: " + opened_page_nums);
     if (opened_page_nums >= max_open_pages) {
-        body = "browser pages is too many, please open new a browser!";
+        body = "browser pages is too many, please open a new browser!";
         response.status(403);
         response.set({
             "cache": "no-cache",
